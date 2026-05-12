@@ -1,5 +1,11 @@
 .DS_Store
 .build/
+build/
 *.o
 *.d
-EZSwitcher
+EZSwitcher_Binary
+EZSwitcher_Tests
+test
+test.m
+test-proj/
+*.dmg

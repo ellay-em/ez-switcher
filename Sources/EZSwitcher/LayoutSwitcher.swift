@@ -37,4 +37,16 @@ class LayoutSwitcher {
         }
         return false
     }
+    
+    func currentLanguageLayout() -> LanguageLayout {
+        guard let source = currentLayout(),
+              let languagesPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages),
+              let languages = Unmanaged<CFArray>.fromOpaque(languagesPtr).takeUnretainedValue() as? [String] else {
+            return .english
+        }
+        
+        if languages.contains(where: { $0.hasPrefix("ru") }) { return .russian }
+        if languages.contains(where: { $0.hasPrefix("uk") }) { return .ukrainian }
+        return .english
+    }
 }
