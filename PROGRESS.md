@@ -39,5 +39,23 @@
 - [x] Figma design token export logic (ready for handoff)
 - [x] Automated test suite for Exclusion logic
 
+### [x] Stage 6: Distribution & Final Handoff
+- [x] Robust `package_app.sh` script with ZIP fallback
+- [x] Successfully compiled `.app` bundle for macOS 13+
+- [x] Ad-hoc code signing and bundle verification
+- [x] Comprehensive `walkthrough.md` created
+
+### [x] Stage 7: Stabilization & Correction Accuracy
+- [x] Implemented CGEvent swallowing to prevent character duplication
+- [x] Increased correction delays (10ms backspace, 50ms stabilization, 5ms typing)
+- [x] Tuned detection thresholds (0.80 min confidence, 0.25 margin)
+- [x] Increased real-time buffer requirement to 6 characters
+
+### [x] Stage 8: System Stability & Mouse Fix
+- [x] Moved Event Tap to a high-priority background thread
+- [x] Removed mouse events from Tap Mask to prevent system-wide hijacking
+- [x] Implemented asynchronous focus/exclusion state caching
+- [x] Added hard-coded exclusion for System Settings to prevent security deadlocks
+
 ---
 *Last Updated: 2026-05-12*
