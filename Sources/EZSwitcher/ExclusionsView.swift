@@ -81,11 +81,9 @@ struct ExclusionsView: View {
                         if manager.excludedWindowTitles.isEmpty {
                             EmptyStateView(message: "No keywords added yet")
                         } else {
-                            FlowLayout(spacing: 8) {
-                                ForEach(manager.excludedWindowTitles, id: \.self) { title in
-                                    KeywordTag(title: title) {
-                                        manager.excludedWindowTitles.removeAll(where: { $0 == title })
-                                    }
+                            FlowLayout(spacing: 8, data: manager.excludedWindowTitles) { title in
+                                KeywordTag(title: title) {
+                                    manager.excludedWindowTitles.removeAll(where: { $0 == title })
                                 }
                             }
                         }

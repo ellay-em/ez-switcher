@@ -19,8 +19,11 @@ class ExclusionManager: ObservableObject {
     @Published var recentApps: [RunningAppInfo] = []
     
     private let defaultExclusions = [
-        "com.apple.Terminal",
         "com.googlecode.iterm2",
+        "com.apple.systemsettings",
+        "com.apple.systempreferences",
+        "com.apple.SecurityAgent",
+        "com.apple.loginwindow",
         "com.apple.dt.Xcode",
         "com.microsoft.VSCode",
         "md.obsidian",
@@ -34,7 +37,7 @@ class ExclusionManager: ObservableObject {
         self.excludedBundleIDs = Set(savedIDs)
         
         self.excludedWindowTitles = UserDefaults.standard.stringArray(forKey: "excludedWindowTitles") ?? [
-            "terminal", "console", "debug", "xcode", "code"
+            "debug", "xcode", "code"
         ]
         
         setupNotification()
@@ -88,6 +91,7 @@ class ExclusionManager: ObservableObject {
         if let title = titleToMatch?.lowercased() {
             for pattern in excludedWindowTitles {
                 if title.contains(pattern.lowercased()) {
+                    print("🚫 App excluded by window title: '\(title)' matches '\(pattern)'")
                     return true
                 }
             }

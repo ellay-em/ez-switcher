@@ -257,7 +257,7 @@ struct TypographySection: View {
                     .background(Color.black.opacity(0.3))
                     .cornerRadius(8)
                     .foregroundColor(.white)
-                    .onChange(of: previewText) { newValue in
+                    .onChange(of: previewText) { _, newValue in
                         let layout = LayoutSwitcher.shared.currentLanguageLayout()
                         let transformed = TextTransformationService.shared.transform(newValue, layout: layout, settings: settings.typographySettings)
                         if transformed != newValue {

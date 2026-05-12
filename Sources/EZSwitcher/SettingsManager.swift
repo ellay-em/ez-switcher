@@ -57,6 +57,17 @@ class SettingsManager: ObservableObject {
         }
     }
     
+    func resetStats() {
+        DispatchQueue.main.async {
+            self.correctionsCountEN = 0
+            self.correctionsCountRU = 0
+            self.correctionsCountUA = 0
+            UserDefaults.standard.set(0, forKey: "stats_en")
+            UserDefaults.standard.set(0, forKey: "stats_ru")
+            UserDefaults.standard.set(0, forKey: "stats_ua")
+        }
+    }
+
     var stats: [Stat] {
         [
             Stat(label: "English", value: "\(correctionsCountEN)", icon: "abc", color: .blue),
