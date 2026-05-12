@@ -49,16 +49,40 @@ class TextTransformationService {
         
         for i in 0..<chars.count {
             let char = chars[i]
-            if char == "\"" || char == "'" {
-                // Directional logic
+            if char == "\"" {
+                // Directional logic for double quotes
                 let isOpening: Bool
                 if i == 0 {
+                    // Start of buffer - usually opening
                     isOpening = true
+                } else if i == chars.count - 1 {
+                    // End of buffer (usually a separator) - usually closing
+                    isOpening = false
                 } else {
                     let prevChar = chars[i-1]
-                    isOpening = prevChar.isWhitespace || prevChar == "(" || prevChar == "[" || prevChar == "{"
+                    let nextChar = chars[i+1]
+                    
+                    // If followed by a space or punctuation, it's likely closing
+                    if nextChar.isWhitespace || ".,!?;:)].".contains(nextChar) {
+                        isOpening = false
+                    } else if prevChar.isWhitespace || "([{".contains(prevChar) {
+                        isOpening = true
+                    } else {
+                        // Ambiguous case: if followed by alphanumeric, it's opening
+                        isOpening = nextChar.isLetter || nextChar.isNumber
+                    }
                 }
                 result += isOpening ? openQuote : closeQuote
+            } else if char == "'" {
+                // For UA, ' is used as an apostrophe and should be ’ (U+2019)
+                // For EN, it can be a quote or apostrophe.
+                if layout == .english {
+                    let isOpening = (i == 0 || chars[i-1].isWhitespace || "([{".contains(chars[i-1]))
+                    result += isOpening ? "‘" : "’"
+                } else {
+                    // RU/UA: mainly used as apostrophe
+                    result += "’" 
+                }
             } else {
                 result.append(char)
             }
@@ -69,10 +93,18 @@ class TextTransformationService {
     
     private func transformDashes(_ text: String) -> String {
         var result = text
-        // " - " -> " — "
-        result = result.replacingOccurrences(of: " - ", with: " — ")
         
-        // "1-10" -> "1–10" (numeric range)
+        // 1. Handle "--" -> "—" (Em-dash)
+        result = result.replacingOccurrences(of: "--", with: "—")
+        
+        // 2. Handle " - " or "- " at start -> " — " (Em-dash with spaces)
+        // Note: we use regular spaces here, orphan control will handle NBSP if needed
+        result = result.replacingOccurrences(of: " - ", with: " — ")
+        if result.hasPrefix("- ") {
+            result = "— " + result.dropFirst(2)
+        }
+        
+        // 3. Handle "1-10" -> "1–10" (Numeric range / En-dash)
         let pattern = "(\\d)-(\\d)"
         if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
             let range = NSRange(result.startIndex..., in: result)
@@ -89,15 +121,15 @@ class TextTransformationService {
     private func applyOrphanControl(_ text: String, layout: LanguageLayout) -> String {
         guard layout == .russian || layout == .ukrainian else { return text }
         
-        // Prepositions and conjunctions that shouldn't stay at the end of a line
-        let orphans = ["и", "в", "а", "о", "с", "у", "к", "я", "з", "та", "і"]
-        var result = text
+        // Prepositions and conjunctions that shouldn't stay at the end of a line (widows/orphans)
+        let orphans = ["и", "в", "а", "о", "с", "у", "к", "я", "з", "та", "і", "на", "об", "от", "до", "по", "из", "за", "не", "же", "ли", "бы", "ль", "б"]
         
+        var result = text
         for orphan in orphans {
-            // Regex to match orphan word preceded by space or start of string
-            // and followed by a regular space. Replace that space with non-breaking space (U+00A0)
+            // Regex to match " orphan " or "^orphan " and replace the trailing space with NBSP
+            // This is safer than simple string replacement as it respects word boundaries
             let pattern = "(^|\\s)(\(orphan)) "
-            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
                 let range = NSRange(result.startIndex..., in: result)
                 result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "$1$2\u{00A0}")
             }

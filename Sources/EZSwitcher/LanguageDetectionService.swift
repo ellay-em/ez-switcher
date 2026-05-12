@@ -27,7 +27,7 @@ class LanguageDetectionService: ObservableObject {
     private init() {}
     
     func suggestLayoutChange(for typedWord: String, currentLayout: LanguageLayout) -> LanguageLayout? {
-        guard typedWord.count >= 3 else { return nil }
+        guard typedWord.count >= 2 else { return nil }
         let startTime = CFAbsoluteTimeGetCurrent()
         
         let translatedRu = typedWord.translating(from: currentLayout, to: .russian)
@@ -40,8 +40,6 @@ class LanguageDetectionService: ObservableObject {
         let hEn = evaluateHeuristic(text: translatedEn, expected: .english)
         
         // 2. Evaluate with NaturalLanguage (if ambiguous or for verification)
-        var nlScores: [LanguageLayout: Double] = [:]
-        
         // Process EN
         recognizer.reset()
         recognizer.processString(translatedEn)
@@ -63,10 +61,10 @@ class LanguageDetectionService: ObservableObject {
         let mlUa = mlScores[.ukrainian] ?? 0
         let mlEn = mlScores[.english] ?? 0
         
-        // Combine scores (Weighted average: 60% heuristic, 30% NL, 10% ML Mock)
-        let ruScore = (hRu * 0.6) + (nlRu * 0.3) + (mlRu * 0.1)
-        let uaScore = (hUa * 0.6) + (nlUa * 0.3) + (mlUa * 0.1)
-        let enScore = (hEn * 0.6) + (nlEn * 0.3) + (mlEn * 0.1)
+        // Combine scores (Weighted average: 80% heuristic, 20% NL, 0% ML Mock)
+        let ruScore = (hRu * 0.8) + (nlRu * 0.2) + (mlRu * 0.0)
+        let uaScore = (hUa * 0.8) + (nlUa * 0.2) + (mlUa * 0.0)
+        let enScore = (hEn * 0.8) + (nlEn * 0.2) + (mlEn * 0.0)
         
         let scores: [LanguageLayout: Double] = [
             .english: enScore,
@@ -77,9 +75,31 @@ class LanguageDetectionService: ObservableObject {
         var bestDecision: LanguageLayout? = nil
         let duration = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
         
+        let currentScore = scores[currentLayout] ?? 0
+        
         // Pick the best match that is NOT the current layout
-        if let best = scores.max(by: { $0.value < $1.value }), best.value > 0.65, best.key != currentLayout {
+        var minThreshold = 0.70 
+        var marginRequirement = 0.15 
+        
+        // Lower thresholds for short words to increase sensitivity
+        if typedWord.count == 2 {
+            minThreshold = 0.60
+            marginRequirement = 0.10
+        }
+        
+        if let best = scores.max(by: { $0.value < $1.value }), 
+           best.value >= minThreshold,
+           best.key != currentLayout,
+           best.value > (currentScore + marginRequirement) {
+            
             bestDecision = best.key
+            print("🧠 Decision: Switch to \(best.key.rawValue) (Score: \(String(format: "%.2f", best.value)), Current Score: \(String(format: "%.2f", currentScore)), Margin OK)")
+        } else if let best = scores.max(by: { $0.value < $1.value }) {
+            if best.key == currentLayout {
+                print("🧠 Decision: Stay on \(currentLayout.rawValue) (Score: \(String(format: "%.2f", best.value)))")
+            } else {
+                print("🧠 Decision: Ambiguous or low margin (Best: \(best.key.rawValue) \(String(format: "%.2f", best.value)), Current: \(String(format: "%.2f", currentScore)))")
+            }
         }
         
         DispatchQueue.main.async {
@@ -100,60 +120,100 @@ class LanguageDetectionService: ObservableObject {
         var score = 0.0
         let textLower = text.lowercased()
         let chars = Array(textLower)
+        let vowels = Set("aeiouy")
+        let cyrVowels = Set("аеёиоуыэюяіїє")
         
         switch expected {
         case .english:
             let matchCount = chars.filter { enChars.contains($0) }.count
-            score = Double(matchCount) / Double(chars.count)
+            let vowelCount = chars.filter { vowels.contains($0) }.count
             
-            // Common EN patterns
-            let enPatterns = ["th", "he", "in", "er", "an", "re", "nd", "at", "on", "nt", "ion", "tio"]
+            // Base score from character ratio (max 0.6)
+            score = (Double(matchCount) / Double(chars.count)) * 0.6
+            
+            // Bonus for having vowels (0.1)
+            if vowelCount > 0 {
+                score += 0.1
+            } else if chars.count >= 2 {
+                score -= 0.3 // Penalty for no vowels in EN (except single letters)
+            }
+            
+            // Common EN patterns/words (0.1)
+            let enPatterns = ["th", "he", "in", "er", "an", "re", "nd", "at", "on", "nt", "ion", "tio", "google", "apple", "http", "www"]
             for pattern in enPatterns {
-                if textLower.contains(pattern) { score += 0.05 }
+                if textLower == pattern || textLower.contains(pattern) { 
+                    score += 0.1 
+                    break 
+                }
             }
             
         case .russian:
             let hasRuUnique = chars.contains { ruUniqueChars.contains($0) }
             let hasUaUnique = chars.contains { uaUniqueChars.contains($0) }
             
-            if hasRuUnique { score += 0.6 }
+            if hasRuUnique { score += 0.3 }
             if hasUaUnique { return 0.0 }
             
             let matchCount = chars.filter { cyrChars.contains($0) }.count
-            score += (Double(matchCount) / Double(chars.count)) * 0.3
+            let vowelCount = chars.filter { cyrVowels.contains($0) }.count
             
-            // RU-specific patterns (absent or rare in UA)
-            let ruPatterns = ["тся", "ых", "ов ", "ич", "его", "раз", "под", "пред"]
+            // Base score from Cyrillic character ratio (max 0.6)
+            score += (Double(matchCount) / Double(chars.count)) * 0.6
+            
+            // Vowel check (0.1)
+            if vowelCount > 0 {
+                score += 0.1
+            }
+            
+            // RU-specific patterns (short words and common prefixes/suffixes)
+            let ruPatterns = ["тся", "ых", "ов ", "ич", "его", "раз", "под", "пред", "пр", "ст", "ко", "но", "про", "пере", "на", "за", "от", "до", "не", "ну", "да", "он", "мы", "вы", "ты", "то", "же", "ли", "бы", "по", "из", "об", "во", "со"]
             for pattern in ruPatterns {
-                if textLower.contains(pattern) { score += 0.15 }
+                if textLower == pattern || textLower.contains(pattern) { 
+                    score += 0.1 
+                }
+            }
+            
+            // Common RU words/endings
+            if textLower.hasSuffix("ие") || textLower.hasSuffix("ия") || textLower.hasSuffix("ую") {
+                score += 0.1
             }
             
         case .ukrainian:
             let hasUaUnique = chars.contains { uaUniqueChars.contains($0) }
             let hasRuUnique = chars.contains { ruUniqueChars.contains($0) }
             
-            if hasUaUnique { score += 0.6 }
+            if hasUaUnique { score += 0.3 }
             if hasRuUnique { return 0.0 }
             
             let matchCount = chars.filter { cyrChars.contains($0) }.count
-            score += (Double(matchCount) / Double(chars.count)) * 0.3
+            let vowelCount = chars.filter { cyrVowels.contains($0) }.count
             
-            // UA-specific patterns (absent or rare in RU)
-            let uaPatterns = ["ння", "цьк", "від", "для", "під", "перед", "всь", "емо"]
-            for pattern in uaPatterns {
-                if textLower.contains(pattern) { score += 0.15 }
+            // Base score (max 0.6)
+            score += (Double(matchCount) / Double(chars.count)) * 0.6
+            
+            // Vowel check (0.1)
+            if vowelCount > 0 {
+                score += 0.1
             }
-        }
-        
-        return min(score, 1.0)
-    }
-.contains(digram) { score += 0.05 }
+            
+            // UA-specific patterns (short words and common prefixes/suffixes)
+            let uaPatterns = ["ння", "цьк", "від", "для", "під", "перед", "всь", "емо", "та", "що", "як", "про", "при", "на", "за", "від", "не", "ну", "так", "він", "ми", "ви", "ти", "то", "же", "чи", "би", "по", "із", "об", "во", "зі"]
+            for pattern in uaPatterns {
+                if textLower == pattern || textLower.contains(pattern) {
+                    score += 0.1
                 }
             }
+            
+            if textLower.hasSuffix("ий") || textLower.hasSuffix("ому") || textLower.hasSuffix("ти") {
+                score += 0.1
+            }
         }
         
-        return min(score, 1.0)
+        let finalScore = max(0, min(score, 1.0))
+        print("   - Heuristic for \(expected.rawValue): \(String(format: "%.2f", finalScore)) (Text: '\(text)')")
+        return finalScore
     }
+
     
     func detectLanguage(for text: String) -> LanguageLayout? {
         let startTime = CFAbsoluteTimeGetCurrent()
