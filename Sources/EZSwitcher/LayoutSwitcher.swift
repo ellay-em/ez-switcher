@@ -13,7 +13,7 @@ class LayoutSwitcher {
     
     /// Returns a list of all available and switchable keyboard layouts
     func availableLayouts() -> [TISInputSource] {
-        let properties = [kTISPropertyInputSourceIsSelectCapable.takeUnretainedValue() as String: true] as CFDictionary
+        let properties = [kTISPropertyInputSourceIsSelectCapable as String: true] as CFDictionary
         let sources = TISCreateInputSourceList(properties, false).takeRetainedValue() as? [TISInputSource]
         return sources ?? []
     }
@@ -26,15 +26,18 @@ class LayoutSwitcher {
     /// Switches layout based on language code (e.g., "en", "ru", "uk")
     func switchLayout(toLanguageCode code: String) -> Bool {
         let layouts = availableLayouts()
+        print("⌨️ Attempting switch to: \(code). Available layouts: \(layouts.count)")
         for layout in layouts {
             if let languagesPtr = TISGetInputSourceProperty(layout, kTISPropertyInputSourceLanguages),
                let languages = Unmanaged<CFArray>.fromOpaque(languagesPtr).takeUnretainedValue() as? [String] {
                 if languages.contains(where: { $0.hasPrefix(code) }) {
+                    print("✅ Found matching layout for \(code). Switching...")
                     switchLayout(to: layout)
                     return true
                 }
             }
         }
+        print("❌ Could not find layout for \(code)")
         return false
     }
     

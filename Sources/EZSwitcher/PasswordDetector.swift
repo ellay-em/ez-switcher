@@ -25,7 +25,7 @@ class PasswordDetector {
         AXUIElementCopyAttributeValue(axElement, kAXRoleAttribute as CFString, &roleRaw)
         AXUIElementCopyAttributeValue(axElement, kAXSubroleAttribute as CFString, &subroleRaw)
         
-        let role = (roleRaw as? String) ?? ""
+        // Check if it's a password field
         let subrole = (subroleRaw as? String) ?? ""
         
         // Check standard secure text field subrole
