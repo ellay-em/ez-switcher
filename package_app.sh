@@ -32,8 +32,8 @@ FILES=$(ls $SOURCE_DIR/*.swift | grep -v "Tests.swift")
 echo "  Files: $(echo $FILES | wc -w | tr -d ' ') source files found"
 
 echo ""
-echo "▶ Step 2: Compiling binary (this may take 2-4 minutes)..."
-swiftc -O \
+echo "▶ Step 2: Compiling binary (Debug mode for speed)..."
+swiftc \
     -o "$APP_BUNDLE/Contents/MacOS/$BINARY_NAME" \
     $FILES \
     -framework Cocoa \
